@@ -4,13 +4,14 @@ const { WebSocketServer } = require('ws');
 const { Client }     = require('ssh2');
 const http           = require('http');
 const path           = require('path');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('crypto');
 const { pool, init } = require('./db');
 const { encryptPassword, decryptPassword } = require('./crypto');
+const { hostGuard, wsAllowed, securityHeaders } = require('./security');
 
 const app    = express();
 const server = http.createServer(app);
-const wss    = new WebSocketServer({ server });
+const wss    = new WebSocketServer({ server, verifyClient: ({ req }) => wsAllowed(req) });
 
 // ── WebSocket heartbeat — keeps connections alive through proxies ──
 // Sends a ping every 25s; if client doesn't pong within 35s, terminate.
@@ -27,6 +28,9 @@ setInterval(() => {
   });
 }, PING_INTERVAL);
 
+// Guards for a service with no login: Host check (DNS rebinding) and security headers
+app.use(securityHeaders);
+app.use(hostGuard);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 

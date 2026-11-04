@@ -60,6 +60,7 @@ Everything is set in `.env` (see `.env.example`).
 | `PORT` | no (7722) | Port the app listens on |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_NAME` | set them explicitly | MariaDB connection. The built-in defaults are placeholders. |
 | `DB_PASSWORD` | yes | MariaDB password. No default. |
+| `ALLOWED_HOSTS` | only behind a proxy | Comma-separated hostnames (no port) the app may be reached by, besides localhost and IP addresses |
 | `ENCRYPTION_KEY` | yes | 64 hex characters (32 bytes) that encrypt device passwords. The app refuses to start without it. |
 
 Back up `ENCRYPTION_KEY` separately from the database. If you lose it, the saved device passwords cannot be recovered.
@@ -70,6 +71,8 @@ Read this before you expose anything beyond your own machine. See also [SECURITY
 
 - **There is no login.** Anyone who can reach the port can open every saved device. Keep it on localhost or a trusted network, or put it behind a reverse proxy that authenticates (basic auth, Authentik, Authelia, and so on). Never expose the port directly to the internet.
 - **No TLS.** Use a reverse proxy with HTTPS and WebSocket support.
+- **Host and Origin checks.** To defeat DNS-rebinding and cross-site WebSocket attacks, the server only answers requests whose Host is `localhost`, an IP address, or a name listed in `ALLOWED_HOSTS` (see `.env.example`), and it rejects WebSocket connections from other origins. Behind a reverse proxy, set `ALLOWED_HOSTS=your.domain` or you will get "Host not allowed".
+- **Security headers.** A Content-Security-Policy, `X-Frame-Options: DENY` and `nosniff` are sent with every response.
 - **SSH server host keys are not verified.** A man-in-the-middle on the path to a server would not be detected. Use it on networks you trust.
 - **Passwords are encrypted at rest** (AES-256-GCM, key from `ENCRYPTION_KEY`). A decrypted password only lives in server memory while a connection is active and is never sent to the browser. Older rows saved as plaintext keep working and are encrypted the next time you save that device.
 - **Password authentication only.** The target account must allow password login. `PermitRootLogin no` or `prohibit-password` on the server blocks root logins; connect as a normal user with `sudo` instead of loosening that setting.
@@ -97,7 +100,7 @@ Express + ws server (server.js)
 
 ## Contributing
 
-Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). There is no automated test suite yet, so adding one is a very welcome contribution.
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Run the tests with `npm test`. They cover the security guards so far; more are welcome.
 
 ## License
 

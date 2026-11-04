@@ -9,7 +9,7 @@ Thanks for considering it — this is a small homelab project, so contributing i
 3. `npm install`
 4. `npm run dev` (uses `nodemon`) or `npm start`
 
-No test suite exists yet — if you add one, that's a welcome contribution on its own.
+Run the tests with `npm test` (Node's built-in test runner). They cover the request guards in `security.js` so far; more tests are very welcome.
 
 ## Good first areas
 

@@ -16,6 +16,7 @@ These are documented so you can decide whether the tool fits your setup:
 
 - **No authentication.** Anyone who can reach the port can use every saved device. Run it on localhost or behind an authenticating reverse proxy.
 - **No TLS.** Terminate HTTPS at a reverse proxy.
+- **Host/Origin checks** protect against DNS rebinding and cross-site WebSocket use, but they are not a login. Anyone who can reach the port with an allowed Host can still use the app.
 - **SSH host keys are not verified**, so a man-in-the-middle between this server and a target would go unnoticed.
 - **Password authentication only** (no SSH keys in this web version).
 - **Device passwords are encrypted at rest** with AES-256-GCM using `ENCRYPTION_KEY`. Whoever holds both the database and that key can read them. Keep the key out of backups of the database.
