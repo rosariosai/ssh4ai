@@ -1,0 +1,23 @@
+# Secrets — never commit real credentials or keys
+.env
+
+# Dependencies
+node_modules/
+
+# Editor / OS cruft
+.DS_Store
+Thumbs.db
+*.log
+
+# Local backups and dev artifacts — not part of the project
+backup_original/
+*.good
+*.good.bak
+
+# Design references (Stitch exports etc.) — working files, not shipped code
+stitch_ssh_terminal_manager_redesign/
+stitch_ssh_terminal_manager_redesign.zip
+stitch_export_v2_clean.html
+
+# Personal operational notes about your own homelab — not part of the project
+HOMELAB-TODO.md
