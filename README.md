@@ -43,7 +43,7 @@ The port is published on `127.0.0.1` only, on purpose: the app has no login (see
 
 ## Quick start (prebuilt image)
 
-No clone and no build. This pulls the published image (`ghcr.io/rosariosai/ssh4ai`, also on Docker Hub when available), creates a `.env` with a random database password and encryption key, and starts everything. Read [the script](deploy/install.sh) first if you like.
+No clone and no build. This pulls the published image (`ghcr.io/rosariosai/ssh4ai`, also on [Docker Hub](https://hub.docker.com/r/sareju74/ssh4ai) as `sareju74/ssh4ai`), creates a `.env` with a random database password and encryption key, and starts everything. Read [the script](deploy/install.sh) first if you like.
 
 Linux / macOS:
 
@@ -56,6 +56,8 @@ Windows (PowerShell):
 ```powershell
 irm https://raw.githubusercontent.com/rosariosai/ssh4ai/main/deploy/install.ps1 | iex
 ```
+
+To use the Docker Hub copy instead of GitHub's, add `SSH4AI_IMAGE=sareju74/ssh4ai:latest` to `.env`, or just run `docker pull sareju74/ssh4ai`.
 
 Open <http://localhost:7722>. **Back up the generated `.env`**: the `ENCRYPTION_KEY` in it is the only way to recover saved device passwords. Images are built for amd64 and arm64.
 
