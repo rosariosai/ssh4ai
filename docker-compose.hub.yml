@@ -1,0 +1,38 @@
+# Run ssh4ai from the prebuilt image (no git clone, no build).
+# Needs a .env next to this file (see deploy/install.sh, which creates it for you).
+services:
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-webssh}
+      MARIADB_USER: ${DB_USER:-webssh}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    volumes:
+      - ssh4ai-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    # Default: GitHub Container Registry. To use Docker Hub instead, set
+    # SSH4AI_IMAGE=<dockerhub-user>/ssh4ai:latest in .env
+    image: ${SSH4AI_IMAGE:-ghcr.io/rosariosai/ssh4ai:latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      PORT: "7722"
+    ports:
+      # Bound to localhost on purpose: the app has no login.
+      - "127.0.0.1:7722:7722"
+
+volumes:
+  ssh4ai-db:

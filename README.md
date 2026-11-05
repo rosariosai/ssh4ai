@@ -41,6 +41,24 @@ Open <http://localhost:7722>. The tables are created on first start.
 
 The port is published on `127.0.0.1` only, on purpose: the app has no login (see [Security](#security)). Put an authenticating reverse proxy in front before you expose it to other machines.
 
+## Quick start (prebuilt image)
+
+No clone and no build. This pulls the published image (`ghcr.io/rosariosai/ssh4ai`, also on Docker Hub when available), creates a `.env` with a random database password and encryption key, and starts everything. Read [the script](deploy/install.sh) first if you like.
+
+Linux / macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rosariosai/ssh4ai/main/deploy/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/rosariosai/ssh4ai/main/deploy/install.ps1 | iex
+```
+
+Open <http://localhost:7722>. **Back up the generated `.env`**: the `ENCRYPTION_KEY` in it is the only way to recover saved device passwords. Images are built for amd64 and arm64.
+
 ## Run without Docker
 
 You need Node.js 18 or newer and a reachable MariaDB/MySQL database with a user that can create tables.
