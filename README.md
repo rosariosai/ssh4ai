@@ -1,6 +1,6 @@
 # ssh4ai
 
-A small, self-hosted SSH terminal manager that runs in your browser. Save your servers once, open them in tabs with a double-click, and keep your commands and notes next to the terminal. The Windows twin is [ssh4ai-windows](https://github.com/rosariosai/ssh4ai-windows).
+A small, self-hosted SSH terminal manager that runs in your browser. Save your servers once, open them in tabs with a double-click, and keep your commands and notes next to the terminal. The Windows twin is [ssh4ai-windows](https://github.com/rosariosai/ssh4ai-windows), also available from the [Microsoft Store](https://apps.microsoft.com/detail/9np25s5l8ck2).
 
 The name means **SSH for AI**: the interface is deliberately plain and predictable, so it is easy for a person to use and easy for a browser-driving AI assistant (for example Claude in Chrome) to operate. There is no built-in AI integration and no MCP server; see [Using it with an AI assistant](#using-it-with-an-ai-assistant) before you give an assistant access to a live shell.
 
