@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NodeOps // Sovereign ssh4ai</title>
+  <title>ssh4ai web</title>
+  <link rel="icon" type="image/png" href="/icon.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -453,6 +454,13 @@
       <button id="help-modal-close" class="btn-modal-close">&times;</button>
     </div>
     <div class="modal-body" style="gap:10px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <img src="/icon.png" alt="ssh4ai logo" width="48" height="48" style="border-radius:10px;">
+        <div>
+          <p style="font-size:15px;font-weight:700;margin:0;font-family:var(--font-mono);">ssh4ai web</p>
+          <p style="font-size:11px;color:var(--text-dim);margin:2px 0 0 0;font-family:var(--font-mono);">v1.0.3 · MIT · github.com/rosariosai/ssh4ai</p>
+        </div>
+      </div>
       <div>
         <p style="font-size:12px;font-weight:700;color:var(--primary);margin:0 0 4px 0;font-family:var(--font-mono);">CONNECTING</p>
         <p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.5;">Double-click any host to open a terminal tab. Multiple concurrent sessions can be open simultaneously.</p>
@@ -476,7 +484,6 @@
         <p style="font-size:12px;font-weight:700;color:var(--primary);margin:0 0 4px 0;font-family:var(--font-mono);">SCRATCHPAD</p>
         <p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.5;">Use the 5 persistent scratchpad buckets (5-column, 1+2 stacked and single merged layouts). Redaction of sensitive data is handled by Presidio (see the Presidio link in the links dock).</p>
       </div>
-      <p style="font-size:10px;color:var(--text-dim);margin-top:6px;text-align:center;font-family:var(--font-mono);">ssh4ai v2.4 // Homelab Edition</p>
     </div>
     <div class="modal-footer">
       <button class="btn btn-primary" id="help-modal-ok">Close</button>
