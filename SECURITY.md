@@ -14,14 +14,14 @@ Only the latest release on the `main` branch is supported.
 
 These are documented so you can decide whether the tool fits your setup:
 
-- **No authentication.** Anyone who can reach the port can use every saved device. Run it on localhost or behind an authenticating reverse proxy.
+- **No authentication by default.** Anyone who can reach the port can use every saved device. Run it on localhost, switch on the optional shared-password login (one password, no per-user accounts), or use an authenticating reverse proxy.
+- **The optional IP allowlist** trusts `X-Forwarded-For` only from addresses listed in `TRUSTED_PROXIES`. Without that, behind a proxy every client looks like the proxy.
 - **No TLS.** Terminate HTTPS at a reverse proxy.
 - **Host/Origin checks** protect against DNS rebinding and cross-site WebSocket use, but they are not a login. Anyone who can reach the port with an allowed Host can still use the app.
 - **SSH host keys are not verified**, so a man-in-the-middle between this server and a target would go unnoticed.
-- **Password authentication only** (no SSH keys in this web version).
-- **Device passwords are encrypted at rest** with AES-256-GCM using `ENCRYPTION_KEY`. Whoever holds both the database and that key can read them. Keep the key out of backups of the database.
+- **Device passwords and private keys are encrypted at rest** with AES-256-GCM using `ENCRYPTION_KEY`. Whoever holds both the database and that key can read them. Keep the key out of backups of the database. The shared login password is stored only as a salted scrypt hash.
 - **Sessions are kept in memory.** A restart closes all open sessions.
-- **No rate limiting** on the API.
+- **No rate limiting on the API** itself; failed login attempts are slowed down when the login is on.
 - **The page loads xterm.js from the jsDelivr CDN.** If that matters to you, vendor the files locally.
 
 ## Using it with AI assistants

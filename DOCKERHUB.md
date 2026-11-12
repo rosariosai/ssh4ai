@@ -32,16 +32,16 @@ docker compose up -d
 
 ## Tags
 
-- `latest`, `1.0.x`, `1.0`: release versions
+- `latest`, `1.1.x`, `1.1`: release versions
 - `sha-xxxxxxx`: a specific commit
 
 Images are built for `linux/amd64` and `linux/arm64`.
 
 ## Security (read before exposing it)
 
-- **There is no login.** Anyone who can reach the port can use every saved device. The compose file publishes the port on `127.0.0.1` only. Put an authenticating reverse proxy with HTTPS in front before exposing it, and set `ALLOWED_HOSTS=your.domain`.
-- SSH server host keys are not verified, and only password login is supported.
-- Device passwords are encrypted at rest (AES-256-GCM) with your `ENCRYPTION_KEY`.
+- **There is no login unless you switch one on** (Settings > Security, or `APP_PASSWORD_HASH`). The compose file publishes the port on `127.0.0.1` only. Before exposing it, turn on the login and put a reverse proxy with HTTPS in front, and set `ALLOWED_HOSTS=your.domain`. An optional IP allowlist is available too.
+- SSH server host keys are not verified.
+- Per-host password or SSH key login (paste, load, or generate an ed25519 key). Passwords and private keys are encrypted at rest (AES-256-GCM) with your `ENCRYPTION_KEY`.
 - An AI assistant driving the terminal has the permissions of the account you connect with. Use a limited account and review what it runs.
 
 See SECURITY.md in the repository for details.

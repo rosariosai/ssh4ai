@@ -53,6 +53,12 @@ async function init() {
     await addColumnIfMissing(conn, 'ssh_devices', 'pinned', 'TINYINT(1) NOT NULL DEFAULT 0');
     await addColumnIfMissing(conn, 'ssh_devices', 'sort_order', 'INT NOT NULL DEFAULT 0');
 
+    // SSH key authentication (per host). Existing rows keep auth_type='password'.
+    await addColumnIfMissing(conn, 'ssh_devices', 'auth_type', "VARCHAR(20) NOT NULL DEFAULT 'password'");
+    await addColumnIfMissing(conn, 'ssh_devices', 'private_key', 'MEDIUMTEXT NULL');
+    await addColumnIfMissing(conn, 'ssh_devices', 'key_passphrase', 'VARCHAR(1024) NULL');
+    await addColumnIfMissing(conn, 'ssh_devices', 'public_key', 'TEXT NULL');
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS ssh_macros (
         id INT AUTO_INCREMENT PRIMARY KEY,

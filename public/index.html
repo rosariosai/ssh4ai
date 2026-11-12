@@ -29,7 +29,6 @@
       <div class="app-branding">
         <span class="app-logo-prompt">&gt;_</span>
         <span class="app-logo-title">ssh4ai</span>
-        <span class="app-logo-sub">// Terminal Manager</span>
       </div>
 
       <!-- Cluster / Connection Status Pill -->
@@ -360,14 +359,52 @@
         <input type="text" id="m-user" class="form-input" placeholder="root">
       </div>
       <div class="form-field">
-        <label>SSH Password / Passphrase</label>
-        <div class="password-field-wrap">
-          <input type="password" id="m-pass" class="form-input" placeholder="••••••••••••" autocomplete="new-password">
-          <button type="button" id="m-pass-toggle" class="btn-pass-toggle" title="Show/hide password" tabindex="-1">
-            <span class="material-symbols-outlined" id="m-pass-toggle-icon">visibility</span>
-          </button>
-        </div>
-      </div>
+<label>Authentication</label>
+<select id="m-auth" class="form-select">
+<option value="password">Password</option>
+<option value="key">Private key</option>
+<option value="key_password">Key + password fallback</option>
+</select>
+</div>
+<div class="form-field" id="m-pass-field">
+<label id="m-pass-label">SSH Password</label>
+<div class="password-field-wrap">
+<input type="password" id="m-pass" class="form-input" placeholder="••••••••••••" autocomplete="new-password">
+<button type="button" id="m-pass-toggle" class="btn-pass-toggle" title="Show/hide password" tabindex="-1">
+<span class="material-symbols-outlined" id="m-pass-toggle-icon">visibility</span>
+</button>
+</div>
+</div>
+<div id="m-key-section" style="display:none;">
+<div class="form-field" id="m-key-saved" style="display:none;">
+<label>Private key</label>
+<div class="key-saved-row">
+<span class="key-saved-badge"><span class="material-symbols-outlined" style="font-size:14px;">key</span> Key saved</span>
+<button type="button" class="btn btn-secondary" id="m-key-replace">Replace key</button>
+</div>
+</div>
+<div class="form-field" id="m-key-input-wrap">
+<label>Private key (paste, load from file, or generate)</label>
+<textarea id="m-key" class="form-textarea key-textarea" rows="5" spellcheck="false" autocomplete="off" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
+<div class="key-actions">
+<button type="button" class="btn btn-secondary" id="m-key-load">Load from file…</button>
+<button type="button" class="btn btn-secondary" id="m-key-generate">Generate key pair</button>
+<input type="file" id="m-key-file" style="display:none;">
+</div>
+</div>
+<div class="form-field">
+<label>Passphrase (optional)</label>
+<input type="password" id="m-keypass" class="form-input" placeholder="only if the key is encrypted" autocomplete="new-password">
+</div>
+<div class="form-field" id="m-pub-wrap" style="display:none;">
+<label>Public key</label>
+<textarea id="m-pub" class="form-textarea key-textarea" rows="2" readonly spellcheck="false"></textarea>
+<div class="key-actions">
+<button type="button" class="btn btn-secondary" id="m-pub-copy">Copy public key</button>
+</div>
+<div class="key-hint">Add this line to <code>~/.ssh/authorized_keys</code> on the target (or to the <b>Authorized Keys</b> field of the Home Assistant Terminal &amp; SSH add-on).</div>
+</div>
+</div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
@@ -458,7 +495,7 @@
         <img src="/icon.png" alt="ssh4ai logo" width="48" height="48" style="border-radius:10px;">
         <div>
           <p style="font-size:15px;font-weight:700;margin:0;font-family:var(--font-mono);">ssh4ai web</p>
-          <p style="font-size:11px;color:var(--text-dim);margin:2px 0 0 0;font-family:var(--font-mono);">v1.0.3 · MIT · github.com/rosariosai/ssh4ai</p>
+          <p style="font-size:11px;color:var(--text-dim);margin:2px 0 0 0;font-family:var(--font-mono);">v1.1.0 · MIT · github.com/rosariosai/ssh4ai</p>
         </div>
       </div>
       <div>
@@ -572,5 +609,6 @@
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
 <script src="/js/app.js"></script>
+<script src="/js/security.js"></script>
 </body>
 </html>

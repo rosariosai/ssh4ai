@@ -329,7 +329,7 @@
           </button>
           <div class="device-card-name-wrap">
             <span class="status-led ${connected ? 'online' : ''}"></span>
-            <span class="device-card-name">${esc(dn)}</span>
+            <span class="device-card-name">${esc(dn)}</span>${dev.auth_type && dev.auth_type !== 'password' ? '<span class="material-symbols-outlined dev-key-icon" style="font-size:13px;" title="Key authentication">key</span>' : ''}
           </div>
           <span class="device-card-badge ${statusBadgeClass}">${statusBadgeText}</span>
         </div>
@@ -495,11 +495,113 @@
     $('m-pass').value = '';
     $('m-pass').type = 'password';
     if ($('m-pass-toggle-icon')) $('m-pass-toggle-icon').textContent = 'visibility';
-    devModalOverlay.classList.remove('hidden');
-    $('m-name').focus();
+    keyUiInit(dev);
+  devModalOverlay.classList.remove('hidden');
+  $('m-name').focus();
   }
 
-  async function deleteDevice(id) {
+  // ═════════════════════════════════════════════════════════════════════════
+// SSH KEY AUTHENTICATION (Add/Edit Host dialog)
+// The server never sends a saved private key back: only has_key / public_key.
+// ═════════════════════════════════════════════════════════════════════════
+
+let keyHas = false; // the host being edited already has a stored private key
+
+function keyUiApply() {
+const mode = $('m-auth') ? $('m-auth').value : 'password';
+if ($('m-key-section')) $('m-key-section').style.display = mode === 'password' ? 'none' : '';
+if ($('m-pass-field')) $('m-pass-field').style.display = mode === 'key' ? 'none' : '';
+if ($('m-pass-label')) $('m-pass-label').textContent = mode === 'key_password' ? 'Fallback SSH Password' : 'SSH Password';
+}
+
+function keyUiState() {
+if ($('m-key-saved')) $('m-key-saved').style.display = keyHas ? '' : 'none';
+if ($('m-key-input-wrap')) $('m-key-input-wrap').style.display = keyHas ? 'none' : '';
+if ($('m-pub-wrap')) $('m-pub-wrap').style.display = ($('m-pub') && $('m-pub').value) ? '' : 'none';
+}
+
+function keyUiInit(dev) {
+if (!$('m-auth')) return;
+$('m-auth').value = (dev && dev.auth_type) || 'password';
+keyHas = !!(dev && dev.has_key);
+$('m-key').value = '';
+$('m-keypass').value = '';
+$('m-pub').value = (dev && dev.public_key) || '';
+keyUiApply();
+keyUiState();
+}
+
+if ($('m-auth')) $('m-auth').addEventListener('change', keyUiApply);
+
+if ($('m-key-replace')) {
+$('m-key-replace').addEventListener('click', () => {
+keyHas = false;
+keyUiState();
+if ($('m-key')) $('m-key').focus();
+});
+}
+
+if ($('m-key-load') && $('m-key-file')) {
+$('m-key-load').addEventListener('click', () => $('m-key-file').click());
+$('m-key-file').addEventListener('change', function() {
+const f = this.files && this.files[0];
+this.value = '';
+if (!f) return;
+if (f.size > 100000) return toast('That file is too large to be a private key', 'error');
+const r = new FileReader();
+r.onload = () => { $('m-key').value = String(r.result || ''); };
+r.onerror = () => toast('Could not read the file', 'error');
+r.readAsText(f);
+});
+}
+
+if ($('m-key-generate')) {
+$('m-key-generate').addEventListener('click', async () => {
+if (keyHas && !confirm('Replace the stored private key with a newly generated one? The old key will be lost.')) return;
+let id = $('m-id').value;
+try {
+if (!id) {
+// New host: save it first (without a key) so the server can attach the generated key to it.
+const name = $('m-name').value.trim(), ip = $('m-ip').value.trim(), user = $('m-user').value.trim();
+if (!name || !ip || !user) return toast('Fill in Host Name, IP Address and Username first', 'error');
+const rc = await fetch('/api/devices', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ device_name: name, ip_address: ip, username: user, port: +$('m-port').value || 22,
+password: $('m-pass').value, auth_type: 'key' }),
+});
+const jc = await rc.json().catch(() => ({}));
+if (!rc.ok) throw new Error(jc.error || 'Could not save host');
+id = String(jc.id);
+$('m-id').value = id;
+$('modal-title').textContent = 'Edit Host';
+}
+const r = await fetch('/api/devices/' + id + '/generate-key', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ replace: true }),
+});
+const j = await r.json().catch(() => ({}));
+if (!r.ok) throw new Error(j.error || 'Key generation failed');
+if ($('m-auth').value === 'password') $('m-auth').value = 'key';
+keyHas = true;
+$('m-key').value = '';
+$('m-pub').value = j.public_key;
+keyUiApply();
+keyUiState();
+loadDevices();
+toast('Key pair generated - add the public key to the target host', 'success');
+} catch (e) {
+toast('Key generation failed: ' + e.message, 'error');
+}
+});
+}
+
+if ($('m-pub-copy')) {
+$('m-pub-copy').addEventListener('click', () => copyToClipboard($('m-pub').value, 'Public key copied'));
+}
+
+async function deleteDevice(id) {
     if (!id) return;
     if (!confirm('Delete this host entry?')) return;
     try {
@@ -558,13 +660,16 @@
         host:        $('m-ip').value.trim(),
         port:        +$('m-port').value || 22,
         username:    $('m-user').value.trim(),
-        password:    $('m-pass').value,
-      };
+        password: $('m-pass').value,
+      auth_type: $('m-auth') ? $('m-auth').value : 'password',
+      private_key: $('m-key') ? $('m-key').value : '',
+      key_passphrase: $('m-keypass') ? $('m-keypass').value : '',
+    };
 
       if (!body.device_name || !body.ip_address || !body.username) {
         return toast('Host Name, IP Address, and Username are required', 'error');
       }
-      if (!id && !body.password) {
+      if (!id && body.auth_type !== 'key' && !body.password) {
         return toast('Password is required for new hosts', 'error');
       }
 
@@ -582,6 +687,8 @@
           throw new Error(errData.error || 'Request failed');
         }
         devModalOverlay.classList.add('hidden');
+        if ($('m-key')) $('m-key').value = '';
+        if ($('m-keypass')) $('m-keypass').value = '';
         loadDevices();
         toast(`Host ${id ? 'updated' : 'added'} successfully`, 'success');
       } catch (e) {
@@ -983,6 +1090,7 @@
         }
       })
       .then((sessionData) => {
+        if (sessionData && sessionData.error) throw new Error(sessionData.error);
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${proto}//${location.host}/ws`);
         sessionObj.ws = ws;

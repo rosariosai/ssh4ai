@@ -8,10 +8,18 @@ const { randomUUID: uuidv4 } = require('crypto');
 const { pool, init } = require('./db');
 const { encryptPassword, decryptPassword } = require('./crypto');
 const { hostGuard, wsAllowed, securityHeaders } = require('./security');
+const access  = require('./access');
+const {
+  AUTH_TYPES, keysEnabled, disabledError, keyFromBody, publicDevice, loadKey,
+  generateKeyPair, publicFromStored, buildSshOptions,
+} = require('./keyauth');
 
 const app    = express();
 const server = http.createServer(app);
-const wss    = new WebSocketServer({ server, verifyClient: ({ req }) => wsAllowed(req) });
+// Upgrades go through access.handleUpgrade (IP allowlist, Origin, login session when enabled);
+// verifyClient keeps the Host / Origin check that protects against DNS rebinding.
+const wss    = new WebSocketServer({ noServer: true, verifyClient: ({ req }) => wsAllowed(req) });
+access.handleUpgrade(server, wss);
 
 // ── WebSocket heartbeat — keeps connections alive through proxies ──
 // Sends a ping every 25s; if client doesn't pong within 35s, terminate.
@@ -28,11 +36,19 @@ setInterval(() => {
   });
 }, PING_INTERVAL);
 
-// Guards for a service with no login: Host check (DNS rebinding) and security headers
+// Guards: security headers and Host check (DNS rebinding) always; the login, IP allowlist and
+// Origin checks of access.js only when configured (APP_PASSWORD_HASH / ALLOWED_CIDRS / Security panel).
 app.use(securityHeaders);
 app.use(hostGuard);
+app.use(access.accessPre);
+access.registerLoginRoutes(app);
+app.use(access.authGate);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
+access.registerSecurityRoutes(app);
+
+const DEVICE_COLS = "id, device_name, ip_address, username, port, pinned, sort_order, auth_type, public_key, " +
+                    "(private_key IS NOT NULL AND private_key <> '') AS has_key";
 
 // ── Active SSH sessions (in-memory) ────────────────────────────────
 const sessions = new Map();
@@ -46,9 +62,9 @@ const sessions = new Map();
 app.get('/api/devices', async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT id, device_name, ip_address, username, port, pinned, sort_order FROM ssh_devices ORDER BY sort_order ASC, id ASC'
+      `SELECT ${DEVICE_COLS} FROM ssh_devices ORDER BY sort_order ASC, id ASC`
     );
-    res.json(rows);
+    res.json(rows.map(publicDevice));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -62,10 +78,10 @@ app.get('/api/devices', async (req, res) => {
 app.get('/api/devices/:id', async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT id, device_name, ip_address, username, port, pinned, sort_order FROM ssh_devices WHERE id = ?', [req.params.id]
+      `SELECT ${DEVICE_COLS} FROM ssh_devices WHERE id = ?`, [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json(rows[0]);
+    res.json(publicDevice(rows[0]));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -79,16 +95,24 @@ app.post('/api/devices', async (req, res) => {
   const username    = req.body.username;
   const password    = req.body.password;
   const port        = req.body.port;
-  if (!device_name || !ip_address || !username || !password) {
-    return res.status(400).json({ error: 'device_name, ip_address, username and password are required' });
+  const auth_type   = req.body.auth_type || 'password';
+  if (!AUTH_TYPES.includes(auth_type)) return res.status(400).json({ error: 'Invalid auth_type' });
+  if (!device_name || !ip_address || !username || (auth_type !== 'key' && !password)) {
+    return res.status(400).json({ error: auth_type === 'key'
+      ? 'device_name, ip_address and username are required'
+      : 'device_name, ip_address, username and password are required' });
   }
+  if (auth_type !== 'password' && !keysEnabled()) return res.status(503).json({ error: disabledError().message });
+  let kp = null;
+  try { kp = keyFromBody(req.body, device_name); } catch (e) { return res.status(e.status || 400).json({ error: e.message }); }
   try {
     const [[{ nextOrder }]] = await pool.query(
       'SELECT COALESCE(MAX(sort_order), 0) + 1 AS nextOrder FROM ssh_devices'
     );
     const [result] = await pool.execute(
-      'INSERT INTO ssh_devices (device_name, ip_address, username, password, port, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
-      [device_name, ip_address, username, encryptPassword(password), port || 22, nextOrder]
+      'INSERT INTO ssh_devices (device_name, ip_address, username, password, port, sort_order, auth_type, private_key, key_passphrase, public_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [device_name, ip_address, username, encryptPassword(password || ''), port || 22, nextOrder,
+       auth_type, kp ? kp.priv : null, kp ? kp.pass : null, kp ? kp.pub : null]
     );
     res.status(201).json({ id: result.insertId });
   } catch (e) {
@@ -128,26 +152,63 @@ app.put('/api/devices/reorder', async (req, res) => {
   }
 });
 
-// Update device
+// Update device. Empty password = keep the stored password; empty private_key = keep the stored key.
 app.put('/api/devices/:id', async (req, res) => {
   const device_name = req.body.device_name || req.body.name;
   const ip_address  = req.body.ip_address  || req.body.host;
   const username    = req.body.username;
   const password    = req.body.password;
   const port        = req.body.port;
+  const auth_type   = req.body.auth_type || 'password';
+  if (!AUTH_TYPES.includes(auth_type)) return res.status(400).json({ error: 'Invalid auth_type' });
+  if (auth_type !== 'password' && !keysEnabled()) return res.status(503).json({ error: disabledError().message });
+  let kp = null;
+  try { kp = keyFromBody(req.body, device_name); } catch (e) { return res.status(e.status || 400).json({ error: e.message }); }
   try {
-    if (password) {
-      await pool.execute(
-        'UPDATE ssh_devices SET device_name=?, ip_address=?, username=?, password=?, port=? WHERE id=?',
-        [device_name, ip_address, username, encryptPassword(password), port || 22, req.params.id]
-      );
-    } else {
-      await pool.execute(
-        'UPDATE ssh_devices SET device_name=?, ip_address=?, username=?, port=? WHERE id=?',
-        [device_name, ip_address, username, port || 22, req.params.id]
-      );
-    }
+    const sets = ['device_name=?', 'ip_address=?', 'username=?', 'port=?', 'auth_type=?'];
+    const vals = [device_name, ip_address, username, port || 22, auth_type];
+    if (password) { sets.push('password=?'); vals.push(encryptPassword(password)); }
+    if (kp) { sets.push('private_key=?', 'key_passphrase=?', 'public_key=?'); vals.push(kp.priv, kp.pass, kp.pub); }
+    vals.push(req.params.id);
+    await pool.execute('UPDATE ssh_devices SET ' + sets.join(', ') + ' WHERE id=?', vals);
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Generate an ed25519 key pair on the server; the private key is stored encrypted, the public key returned.
+app.post('/api/devices/:id/generate-key', async (req, res) => {
+  if (!keysEnabled()) return res.status(503).json({ error: disabledError().message });
+  try {
+    const [rows] = await pool.execute('SELECT id, device_name, auth_type, private_key FROM ssh_devices WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const d = rows[0];
+    if (d.private_key && !(req.body && req.body.replace === true)) {
+      return res.status(409).json({ error: 'Host already has a private key; send {"replace":true} to overwrite it' });
+    }
+    const pair = generateKeyPair(d.device_name);
+    const newAuth = d.auth_type === 'password' ? 'key' : d.auth_type;
+    await pool.execute(
+      'UPDATE ssh_devices SET auth_type=?, private_key=?, key_passphrase=NULL, public_key=? WHERE id=?',
+      [newAuth, pair.priv, pair.pub, req.params.id]
+    );
+    res.json({ public_key: pair.pub, auth_type: newAuth });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Public key of a host (derived from the stored private key if not saved yet).
+app.get('/api/devices/:id/public-key', async (req, res) => {
+  try {
+    const [rows] = await pool.execute('SELECT device_name, private_key, key_passphrase, public_key FROM ssh_devices WHERE id = ?', [req.params.id]);
+    if (!rows.length || (!rows[0].private_key && !rows[0].public_key)) return res.status(404).json({ error: 'No key stored for this host' });
+    const d = rows[0];
+    if (d.public_key) return res.json({ public_key: d.public_key });
+    const pub = publicFromStored(d);
+    await pool.execute('UPDATE ssh_devices SET public_key=? WHERE id=?', [pub, req.params.id]);
+    res.json({ public_key: pub });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -285,6 +346,14 @@ app.post('/api/connect/:deviceId', async (req, res) => {
       return res.status(500).json({ error: e.message });
     }
 
+    // Key authentication: resolve and validate the stored key before the session is created.
+    let authType = 'password', privateKey, passphrase;
+    if (device.auth_type && device.auth_type !== 'password') {
+      authType = device.auth_type;
+      try { ({ privateKey, passphrase } = loadKey(device)); }
+      catch (e) { return res.status(400).json({ error: e.message }); }
+    }
+
     sessions.set(sessionId, {
       id:        sessionId,
       deviceId:  device.id,
@@ -293,6 +362,9 @@ app.post('/api/connect/:deviceId', async (req, res) => {
       port:      device.port || 22,
       username:  device.username,
       password:  plainPassword,
+      auth_type: authType,
+      privateKey,
+      passphrase,
       ws:        null,
       ssh:       null,
       stream:    null,
@@ -394,6 +466,8 @@ wss.on('connection', (ws) => {
 
 function connectSSH(session) {
   const conn = new Client();
+  // Servers such as ESXi use keyboard-interactive instead of plain password auth.
+  conn.on('keyboard-interactive', (n, i, l, prompts, finish) => finish(prompts.map(() => session.password)));
   session.ssh = conn;
 
   conn.on('ready', () => {
@@ -427,7 +501,7 @@ function connectSSH(session) {
   });
 
   try {
-    conn.connect({ host: session.host, port: session.port, username: session.username, password: session.password });
+    conn.connect(buildSshOptions(session));
   } catch (e) {
     send(session, { type: 'error', data: e.message });
   }
@@ -472,6 +546,7 @@ try {
 }
 
 init()
+  .then(() => access.loadAccessSettings())
   .then(() => initLinks())
   .then(() => {
     server.listen(PORT, () => {
